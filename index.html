@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oluwanii Signature Cut - Appointment Booking</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <h1>OLUWANII SIGNATURE CUTS</h1>
+    <p>Book Your Appointment</p>
+  </header>
+
+  <div class="container">
+    <div class="advert">
+      <strong>🔥 Special Promo!</strong>
+      <p>
+        Get the best cuts and trims in town! First-time customers get 10% off on any full package.
+        Book now to reserve your slot! Call: +234 702 511 3434 for more info.
+      </p>
+    </div>
+
+    <div class="pricing-box">
+      <h2>Pricing</h2>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>Haircut</h3>
+          <p class="price">2,000 naira</p>
+          <p>Fresh fades and clean styles</p>
+        </div>
+        <div class="pricing-card">
+          <h3>Shave</h3>
+          <p class="price">1,500 naira</p>
+          <p>Smooth and stylish grooming</p>
+        </div>
+        <div class="pricing-card">
+          <h3>Beard Trimming</h3>
+          <p class="price">1,000 naira</p>
+          <p>Beard line-up and styling</p>
+        </div>
+        <div class="pricing-card">
+          <h3>Full Package</h3>
+          <p class="price">3,000 naira</p>
+          <p>Haircut + Shave + Styling</p>
+        </div>
+        <div class="pricing-card">
+          <h3>Mobile Barbing</h3>
+          <p class="price">5,000 naira</p>
+          <p>Haircut + Shave + Styling</p>
+        </div>
+        <div class="pricing-card">
+          <h3>Hair Dye</h3>
+          <p class="price">1,000 naira</p>
+          <p>Styling to different colors</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>Appointment Form</h2>
+    <form id="appointmentForm" class="appointment-form">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" placeholder="Enter your full name" required />
+
+      <label for="email">Email Address</label>
+      <input type="email" id="email" placeholder="Enter your email" required />
+
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" placeholder="Enter your phone number" required />
+
+      <label for="service">Select Service</label>
+      <select id="service" required>
+        <option value="">-- Choose a service</option>
+        <option value="Haircut">Haircut</option>
+        <option value="Shave">Shave</option>
+        <option value="Beard Trim">Beard Trim</option>
+        <option value="Full Package">Full Package</option>
+        <option value="Hair Dye">Hair Dye</option>
+        <option value="Mobile Barbing">Mobile Barbing</option>
+      </select>
+
+      <label for="date">Preferred Date</label>
+      <input type="date" id="date" required />
+
+      <label for="time">Preferred Time</label>
+      <input type="time" id="time" required />
+
+      <label for="notes">Additional Notes (optional)</label>
+      <textarea id="notes" rows="4" placeholder="Enter any extra info..."></textarea>
+
+      <label for="upload">Upload Reference Image (optional)</label>
+      <input type="file" id="upload" accept="image/*" />
+
+      <button type="submit" class="submit-button">Book Appointment</button>
+    </form>
+  </div>
+
+  <section class="gallery">
+    <img src="affro.jpeg.jpg" alt="Clean fade haircut" />
+    <img src="afro.jpeg.jpg" alt="Sharp edge style" />
+    <img src="lowctzafro.jpeg" alt="Classic trim" />
+    <img src="blackafro.jpeg.jpg" alt="Modern look cut" />
+    <img src="lowcut.jpeg" alt="Modern look cut" />
+    <img src="lowcutafro.jpeg" alt="Classic trim" />
+  </section>
+
+  <footer>
+    <p>&copy; 2025 Oluwanii Signature Cut. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.getElementById("appointmentForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const token = "8026364800:AAHzkJz0wFsFkJUMR60JKrFYes4Dx_gxH5k";
+      const chat_id = "7722975894";
+
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
+      const phone = document.getElementById("phone").value;
+      const service = document.getElementById("service").value;
+      const date = document.getElementById("date").value;
+      const time = document.getElementById("time").value;
+      const notes = document.getElementById("notes").value;
+
+      const message = `💈 *New Appointment Booking* 💈\n\n👤 *Name:* ${name}\n📧 *Email:* ${email}\n📱 *Phone:* ${phone}\n✂️ *Service:* ${service}\n📅 *Date:* ${date}\n⏰ *Time:* ${time}\n📝 *Notes:* ${notes || "None"}`;
+
+      const url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${chat_id}&text=${encodeURIComponent(message)}&parse_mode=Markdown`;
+
+      // Send the appointment details to Telegram
+       fetch(url)
+        .then(response => {
+          if (response.ok) {
+            alert("✅ Appointment booked successfully! We'll contact you soon.");
+            document.getElementById("appointmentForm").reset(); // Clear the form
+          } else {
+            alert("❌ Failed to send to Telegram. Please try again.");
+          }
+        })
+        .catch(error => {
+          console.error("Error:", error);
+          alert("❌ An error occurred while sending your appointment. Please try again.");
+        });
+    });
+  </script>
+</body>
+</html>
