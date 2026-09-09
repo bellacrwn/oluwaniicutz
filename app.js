@@ -13,8 +13,11 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   };
 
-  var TOKEN = "8026364800:AAHzkJz0wFsFkJUMR60JKrFYes4Dx_gxH5k";
-  var CHAT_ID = "-1002551826027";
+  /* Bookings go through the site's own secure endpoint (the Telegram bot
+     token lives server-side — see lib/booking-handler.js, api/, netlify/,
+     or server.js). If the site and the API are hosted on different origins,
+     change this to the full URL, e.g. "https://your-api.example.com/api/book". */
+  var BOOKING_ENDPOINT = "/api/book";
   var MAX_IMAGE_MB = 10; // Telegram sendPhoto limit
   var BOOKING_KEY = "oluwaniicutz_last_booking";
 
@@ -309,11 +312,62 @@
     });
   });
 
-  /* ---------- Submit: validate, send to Telegram, redirect ---------- */
+  /* ---------- Submit: validate, send to /api/book, redirect ---------- */
 
-  // Escape Markdown specials so Telegram never fails on a name with "_" etc.
-  function md(s) {
-    return String(s).replace(/[_*[\]]/g, "\\$&");
+  var PAYLOAD_KEYS = ["name", "email", "phone", "service", "date", "time", "notes"];
+
+  function serverErrorMessage(status) {
+    if (status === 429) {
+      return "You’ve made several booking attempts in a short time — please wait a few minutes and try again.";
+    }
+    if (status === 503) {
+      return "Booking is temporarily unavailable. Please call or WhatsApp us on +234 702 511 3434 instead.";
+    }
+    if (status === 413) {
+      return "Your upload is too large. Please choose a smaller image (max 10 MB).";
+    }
+    return (
+      "We couldn’t send your booking just now. Please try again, or " +
+      "<a href='https://wa.me/2347025113434' target='_blank' rel='noopener'>WhatsApp us directly</a>."
+    );
+  }
+
+  function handleBookingResponse(res, booking) {
+    return res.json().catch(function () { return null; }).then(function (j) {
+      if (res.ok) {
+        try {
+          localStorage.setItem(
+            BOOKING_KEY,
+            JSON.stringify({
+              name: booking.name,
+              service: booking.service,
+              date: booking.date,
+              time: booking.time,
+              phone: booking.phone
+            })
+          );
+        } catch (err) {
+          /* private mode — the redirect still works, summary just stays generic */
+        }
+        window.location.href = "thank-you-page.html";
+        return;
+      }
+
+      // Server-side field errors → show them under the matching fields
+      if (j && j.errors) {
+        var first = null;
+        PAYLOAD_KEYS.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el && j.errors[id]) {
+            setFieldError(el, j.errors[id]);
+            if (!first) first = el;
+          }
+        });
+        if (first) first.focus();
+      }
+      showBanner("error", (j && j.error) || serverErrorMessage(res.status));
+      setLoading(false);
+    });
   }
 
   form.addEventListener("submit", function (e) {
@@ -330,55 +384,24 @@
 
     if (firstInvalid) {
       firstInvalid.focus();
-      showBanner(
-        "error",
-        "Please fix the highlighted fields and try again."
-      );
+      showBanner("error", "Please fix the highlighted fields and try again.");
       return;
     }
 
-    var name = document.getElementById("name").value.trim();
-    var email = document.getElementById("email").value.trim();
-    var phone = document.getElementById("phone").value.trim();
-    var service = document.getElementById("service").value;
-    var date = dateInput.value;
-    var time = timeInput.value;
-    var notes = document.getElementById("notes").value.trim();
+    var booking = {
+      name: document.getElementById("name").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      service: document.getElementById("service").value,
+      date: dateInput.value,
+      time: timeInput.value,
+      notes: document.getElementById("notes").value.trim()
+    };
     var image = uploadInput.files && uploadInput.files[0];
-
-    var message =
-      "💈 *New Appointment Booking* 💈\n\n" +
-      "👤 *Name:* " + md(name) + "\n" +
-      "📧 *Email:* " + md(email) + "\n" +
-      "📱 *Phone:* " + md(phone) + "\n" +
-      "✂️ *Service:* " + md(service) + "\n" +
-      "📅 *Date:* " + md(date) + "\n" +
-      "⏰ *Time:* " + md(time) + "\n" +
-      "📝 *Notes:* " + md(notes || "None");
 
     setLoading(true);
 
-    function finish(ok, failText) {
-      if (ok) {
-        try {
-          localStorage.setItem(
-            BOOKING_KEY,
-            JSON.stringify({ name: name, service: service, date: date, time: time, phone: phone })
-          );
-        } catch (err) {
-          /* private mode — the redirect still works, summary just stays generic */
-        }
-        window.location.href = "thank-you-page.html";
-      } else {
-        setLoading(false);
-        showBanner("error", failText);
-      }
-    }
-
-    var sendFail =
-      "We couldn’t send your booking just now. Please try again, or " +
-      "<a href='https://wa.me/2347025113434' target='_blank' rel='noopener'>WhatsApp us directly</a>.";
-
+    var request;
     if (
       image &&
       image.type &&
@@ -386,50 +409,26 @@
       image.size <= MAX_IMAGE_MB * 1024 * 1024
     ) {
       var formData = new FormData();
-      formData.append("chat_id", CHAT_ID);
-      formData.append("photo", image);
-      formData.append("caption", message);
-      formData.append("parse_mode", "Markdown");
-
-      fetch("https://api.telegram.org/bot" + TOKEN + "/sendPhoto", {
-        method: "POST",
-        body: formData
-      })
-        .then(function (res) {
-          if (res.ok) {
-            finish(true);
-          } else {
-            setLoading(false);
-            showBanner("error", sendFail);
-          }
-        })
-        .catch(function () {
-          setLoading(false);
-          showBanner("error", "Network error occurred. Please check your connection and try again.");
-        });
+      PAYLOAD_KEYS.forEach(function (k) {
+        formData.append(k, booking[k]);
+      });
+      formData.append("photo", image, image.name || "reference.jpg");
+      request = fetch(BOOKING_ENDPOINT, { method: "POST", body: formData });
     } else {
-      var url =
-        "https://api.telegram.org/bot" +
-        TOKEN +
-        "/sendMessage?chat_id=" +
-        encodeURIComponent(CHAT_ID) +
-        "&text=" +
-        encodeURIComponent(message) +
-        "&parse_mode=Markdown";
-
-      fetch(url)
-        .then(function (res) {
-          if (res.ok) {
-            finish(true);
-          } else {
-            setLoading(false);
-            showBanner("error", sendFail);
-          }
-        })
-        .catch(function () {
-          setLoading(false);
-          showBanner("error", "Network error occurred. Please check your connection and try again.");
-        });
+      request = fetch(BOOKING_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(booking)
+      });
     }
+
+    request
+      .then(function (res) {
+        return handleBookingResponse(res, booking);
+      })
+      .catch(function () {
+        setLoading(false);
+        showBanner("error", "Network error occurred. Please check your connection and try again.");
+      });
   });
 })();

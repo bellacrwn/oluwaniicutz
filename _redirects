@@ -1,0 +1,3 @@
+# Netlify only: route the booking endpoint to the function.
+# (Ignored by Vercel / the standalone server.)
+/api/book /.netlify/functions/book 200
